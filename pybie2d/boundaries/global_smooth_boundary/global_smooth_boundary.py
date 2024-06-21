@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import matplotlib as mpl
 import scipy.signal
 import warnings
 import os
@@ -74,6 +75,7 @@ class Global_Smooth_Boundary(Boundary):
         self.max_h = np.max(self.weights)
         self.area = self.dt*np.sum(self.x*self.cp.imag)
         self.perimeter = self.dt*np.sum(self.speed)
+        self.poly= mpl.path.Path(np.column_stack([self.x, self.y]))
 
         self.defined_modules =  [   'Laplace_SLP_Self_Kress',
                                     'Stokes_SLP_Self_Kress',
@@ -193,15 +195,49 @@ class Global_Smooth_Boundary(Boundary):
     #########################
     #### Private Methods ####
     #########################
-
-    def _test_inside_point(self, candidate, eps=1e-10):
+    
+    # THIS ROUTINE IS NOT RELIABLE
+    #def _test_inside_point(self, candidate, eps=1e-10):
+    #    """
+    #    Test whether the provided or generated inside point is acceptable
+    #    returns True if the point is okay, False if its not
+    #    """
+    #    test_value = np.sum(self.complex_weights/(self.c-candidate))
+    #    return np.abs(test_value - 2.0j*np.pi) < eps
+    ## end _test_inside_point function
+ 
+    # THIS ROUTINE IS RELIABLE AND INDEPENDENT OF MATPLOTLIB
+    #def _test_inside_point(self, candidate, eps=1e-12):
+    #    """
+    #    Test whether the provided or generated inside point is acceptable
+    #    returns True if the point is okay, False if its not
+    #    Algorithm: point in polygon (the points in self.c are interpreted as closed polygon),
+    #    the sum of angles between the vectors from the point (candidate) to two consecutive points on the boundary #
+    #     polygon. the sum is equal 2pi only if the point lies inside. Safe way to compute the angle is using arctan2 of #(a x b)/(a.b).
+    #     """
+    #     a=self.c-candidate
+    #     if (np.any(np.abs(a)<eps)):
+    #       return False # closer than eps to a boundary point, so labelled not inside
+    #     # angle between two "vectors" expressed as a complex number: a[i]=c[i]-cpoint,b=a[i+1]
+    #     b=np.roll(a,-1,axis=0)
+    #     axb=(a.real*b.imag-a.imag*b.real)
+    #     adotb=a.real*b.real+a.imag*b.imag
+    #     # compute sum of angles
+    #     test_value=np.sum(np.arctan2(axb,adotb)) 
+    #     return np.abs(test_value - 2.0*np.pi) < eps
+    ##  end _test_inside_point function
+ 
+    # THIS ROUTINE IS RELIABLE, DEPENDS OF MATPLOTLIB (same use as in `find_interior_points`) 
+    def _test_inside_point(self, candidate):
         """
         Test whether the provided or generated inside point is acceptable
-        returns True if the point is okay, False if its not
+        returns True if the point (=candidate) is okay, False if its not
+        Algorithm: 
+        approximate the boundary points as a closed polygon, which is
+        initialized in self.poly using matplotlib.path. Then use the contains_point method
+        to check if the point lies inside the polygon (analogous to `find_interior_points`)
         """
-        test_value = np.sum(self.complex_weights/(self.c-candidate))
-        return np.abs(test_value - 2.0j*np.pi) < eps
-    # end _test_inside_point function
+        return self.poly.contains_point([candidate.real,candidate.imag])
 
 def arr_check(x):
     if type(x) != np.ndarray:
